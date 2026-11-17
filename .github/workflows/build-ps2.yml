@@ -19,21 +19,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build PS2 app with official PS2SDK image
+      - name: Build PS2 app with PS2DEV
         run: |
           docker run --rm \
             --user 0 \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work/ps2 \
-            ghcr.io/ps2dev/ps2sdk:latest \
+            ghcr.io/ps2dev/ps2dev:latest \
             sh -ec '
-              echo "Installing build tools..."
+              echo "Installing make..."
               apk add --no-cache make
 
+              echo "Environment:"
+              echo "PS2DEV=$PS2DEV"
               echo "PS2SDK=$PS2SDK"
-              echo "Checking compiler..."
-              command -v ee-gcc
-              command -v make
+
+              echo "Available compilers:"
+              command -v mips64r5900el-ps2-elf-gcc || true
+              command -v ee-gcc || true
+
+              echo "Compiler directory:"
+              ls -la "$PS2DEV/ee/bin" | head -30
 
               echo "Building PS2 Audio Bridge..."
               make clean
