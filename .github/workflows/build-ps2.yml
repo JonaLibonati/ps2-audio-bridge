@@ -1,0 +1,35 @@
+name: Build PS2 ELF
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build PS2 app with official PS2SDK image
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work/ps2 \
+            ghcr.io/ps2dev/ps2sdk:latest \
+            sh -ec 'echo "PS2SDK=$PS2SDK"; make clean; make'
+
+      - name: Upload ELF artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps2-audio-bridge-elf
+          path: ps2/ps2_audio_bridge_test.elf
+          if-no-files-found: error
+          retention-days: 14
