@@ -1,3 +1,4 @@
+
 name: Build PS2 ELF
 
 on:
@@ -13,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,10 +22,23 @@ jobs:
       - name: Build PS2 app with official PS2SDK image
         run: |
           docker run --rm \
+            --user 0 \
             -v "$GITHUB_WORKSPACE:/work" \
             -w /work/ps2 \
             ghcr.io/ps2dev/ps2sdk:latest \
-            sh -ec 'echo "PS2SDK=$PS2SDK"; make clean; make'
+            sh -ec '
+              echo "Installing build tools..."
+              apk add --no-cache make
+
+              echo "PS2SDK=$PS2SDK"
+              echo "Checking compiler..."
+              command -v ee-gcc
+              command -v make
+
+              echo "Building PS2 Audio Bridge..."
+              make clean
+              make
+            '
 
       - name: Upload ELF artifact
         if: success()
