@@ -493,18 +493,35 @@ int main(int argc, char **argv)
 
     make_eos_packet(total_packets);
 
-    sent = sendto(
-        sock,
-        eos_packet,
-        HEADER_LEN,
-        0,
-        (struct sockaddr *)&target,
-        sizeof(target)
-    );
+    /*
+    * Send the end-of-stream marker multiple times.
+    * UDP does not guarantee delivery.
+    *
+    * Give the network stack time to finish transmitting
+    * before closing the socket and deinitializing ps2ip.
+    */
 
-    if (sent != HEADER_LEN) {
-        ++eos_errors;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+
+        sent = sendto(
+            sock,
+            eos_packet,
+            HEADER_LEN,
+            0,
+            (struct sockaddr *)&target,
+            sizeof(target)
+        );
+
+        if (sent != HEADER_LEN) {
+            ++eos_errors;
+        }
+
+        usleep(20000);
     }
+
+    /* Allow queued network traffic to drain. */
+    usleep(200000);
+
 
     elapsed_ms = (uint32_t)(
         (end_ticks - start_ticks)
