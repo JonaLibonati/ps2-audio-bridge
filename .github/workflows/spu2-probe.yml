@@ -1,0 +1,39 @@
+
+name: Build SPU2 Capture Probe
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "ps2/spu2_probe/**"
+      - ".github/workflows/spu2-probe.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ps2dev/ps2dev:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install make
+        run: apk add --no-cache make
+
+      - name: Check toolchain
+        run: |
+          echo "PS2SDK=$PS2SDK"
+          test -f "$PS2SDK/samples/Makefile.iopglobal"
+          test -f "$PS2SDK/samples/Makefile.eeglobal"
+          test -f "$PS2SDK/iop/irx/freesd.irx"
+
+      - name: Build probe
+        run: make -C ps2/spu2_probe
+
+      - name: Upload ELF
+        uses: actions/upload-artifact@v4
+        with:
+          name: spu2-capture-probe
+          path: ps2/spu2_probe/spu2_probe.elf
+          if-no-files-found: error

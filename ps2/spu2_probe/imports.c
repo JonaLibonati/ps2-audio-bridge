@@ -1,0 +1,25 @@
+
+#include <irx_imports.h>
+#include <libsd.h>
+#include <sifcmd.h>
+#include <thbase.h>
+
+libsd_IMPORTS_start
+    I_sceSdInit
+    I_sceSdQuit
+    I_sceSdVoiceTrans
+    I_sceSdVoiceTransStatus
+libsd_IMPORTS_end
+
+sifcmd_IMPORTS_start
+    I_sceSifInitRpc
+    I_sceSifSetRpcQueue
+    I_sceSifRegisterRpc
+    I_sceSifRpcLoop
+sifcmd_IMPORTS_end
+
+thbase_IMPORTS_start
+    I_CreateThread
+    I_StartThread
+    I_GetThreadId
+thbase_IMPORTS_end
