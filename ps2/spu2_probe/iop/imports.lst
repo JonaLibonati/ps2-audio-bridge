@@ -1,9 +1,4 @@
 
-#include <irx_imports.h>
-#include <libsd.h>
-#include <sifcmd.h>
-#include <thbase.h>
-
 libsd_IMPORTS_start
     I_sceSdInit
     I_sceSdQuit
