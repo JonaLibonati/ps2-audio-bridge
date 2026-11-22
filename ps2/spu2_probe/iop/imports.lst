@@ -18,3 +18,7 @@ thbase_IMPORTS_start
     I_StartThread
     I_GetThreadId
 thbase_IMPORTS_end
+
+sysclib_IMPORTS_start
+    I_memset
+sysclib_IMPORTS_end
