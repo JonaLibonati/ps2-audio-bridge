@@ -7,7 +7,7 @@ EE_LIBS = -ldebug -lpatches -lkernel
 
 all: $(EE_BIN)
 
-iop/spu2probe.irx: capture_irx.c imports.c iop/Makefile
+iop/spu2probe.irx: capture_irx.c iop/imports.lst iop/Makefile
 	$(MAKE) -C iop
 
 freesd_irx.c: $(PS2SDK)/iop/irx/freesd.irx
