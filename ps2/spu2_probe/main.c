@@ -38,6 +38,15 @@ typedef struct {
     int right_max;
     unsigned int left_first;
     unsigned int right_first;
+    int playback_status;
+    int playback_transfer;
+    unsigned int playback_reads;
+    unsigned int playback_left_nonzero;
+    unsigned int playback_right_nonzero;
+    int playback_left_min;
+    int playback_left_max;
+    int playback_right_min;
+    int playback_right_max;
 } probe_result_t;
 
 static SifRpcClientData_t rpc_client
@@ -46,10 +55,13 @@ static SifRpcClientData_t rpc_client
 static unsigned int rpc_send[16]
     __attribute__((aligned(64)));
 
-static probe_result_t rpc_result
+
+static unsigned int rpc_result_storage[32]
     __attribute__((aligned(64)));
 
-static void init_iop(void)
+#define RPC_RESULT \
+    (*(probe_result_t *)rpc_result_storage)
+
 {
     SifInitRpc(0);
 
@@ -136,7 +148,7 @@ int main(void)
     }
 
     memset(rpc_send, 0, sizeof(rpc_send));
-    memset(&rpc_result, 0, sizeof(rpc_result));
+    memset(rpc_result_storage, 0, sizeof(rpc_result_storage));
 
     ret = SifCallRpc(
         &rpc_client,
@@ -144,8 +156,8 @@ int main(void)
         0,
         rpc_send,
         sizeof(rpc_send),
-        &rpc_result,
-        sizeof(rpc_result),
+        rpc_result_storage,
+        sizeof(probe_result_t),
         NULL,
         NULL
     );
@@ -189,6 +201,46 @@ int main(void)
     } else {
         scr_printf("\nDMA round-trip FAILED\n");
     }
+
+    scr_printf("\n--- SPU2 PLAYBACK TEST ---\n");
+
+    scr_printf(
+        "Playback status: %d\n",
+        RPC_RESULT.playback_status
+    );
+
+    scr_printf(
+        "ADPCM upload: %d\n",
+        RPC_RESULT.playback_transfer
+    );
+
+    scr_printf(
+        "Capture reads: %u\n",
+        RPC_RESULT.playback_reads
+    );
+
+    scr_printf(
+        "Left nonzero: %u\n",
+        RPC_RESULT.playback_left_nonzero
+    );
+
+    scr_printf(
+        "Left min/max: %d / %d\n",
+        RPC_RESULT.playback_left_min,
+        RPC_RESULT.playback_left_max
+    );
+
+    scr_printf(
+        "Right nonzero: %u\n",
+        RPC_RESULT.playback_right_nonzero
+    );
+
+    scr_printf(
+        "Right min/max: %d / %d\n",
+        RPC_RESULT.playback_right_min,
+        RPC_RESULT.playback_right_max
+    );
+
 
 halt:
     scr_printf("\nSafe to restart PS2.\n");

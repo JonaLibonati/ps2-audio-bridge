@@ -26,6 +26,13 @@ IRX_ID("spu2probe", 1, 0);
 #define CORE0_LEFT     0x0800
 #define CORE0_RIGHT    0x0A00
 
+#define TEST_VOICE       0
+#define TEST_ADPCM_ADDR  0x20000
+#define TEST_ADPCM_SIZE  512
+#define TEST_READS       20
+#define TEST_INTERVAL_US 10000
+
+
 typedef struct {
     s32 status;
     s32 dma_write;
@@ -39,6 +46,15 @@ typedef struct {
     s32 right_max;
     u32 left_first;
     u32 right_first;
+    s32 playback_status;
+    s32 playback_transfer;
+    u32 playback_reads;
+    u32 playback_left_nonzero;
+    u32 playback_right_nonzero;
+    s32 playback_left_min;
+    s32 playback_left_max;
+    s32 playback_right_min;
+    s32 playback_right_max;
 } probe_result_t;
 
 static u8 source[BUFFER_SIZE]
@@ -48,6 +64,8 @@ static u8 destination[BUFFER_SIZE]
 static u8 left_buffer[BUFFER_SIZE]
     __attribute__((aligned(64)));
 static u8 right_buffer[BUFFER_SIZE]
+    __attribute__((aligned(64)));
+static u8 test_adpcm[TEST_ADPCM_SIZE]
     __attribute__((aligned(64)));
 
 static probe_result_t result
@@ -126,6 +144,244 @@ static void analyze(
             *maximum = value;
         }
     }
+}
+
+
+/*
+ * Create 32 PS-ADPCM frames, each 16 bytes.
+ *
+ * A frame decodes to 28 PCM samples.
+ * Predictor 0, shift 8.
+ * Alternating positive and negative blocks produce
+ * a recognizable periodic signal.
+ *
+ * ADPCM loop markers:
+ *   first frame: loop start
+ *   last frame:  loop end + repeat
+ */
+static void build_test_sample(void)
+{
+    int block;
+    int j;
+
+    memset(test_adpcm, 0, sizeof(test_adpcm));
+
+    for (block = 0; block < 32; ++block) {
+        int offset = block * 16;
+        u8 value = (block & 1) ? 0xDD : 0x33;
+
+        test_adpcm[offset] = 0x08;
+        test_adpcm[offset + 1] = 0;
+
+        if (block == 0) {
+            test_adpcm[offset + 1] = 0x06;
+        }
+
+        if (block == 31) {
+            test_adpcm[offset + 1] = 0x03;
+        }
+
+        for (j = 2; j < 16; ++j) {
+            test_adpcm[offset + j] = value;
+        }
+    }
+}
+
+static void accumulate_stats(
+    const u8 *buffer,
+    u32 *nonzero_total,
+    s32 *minimum,
+    s32 *maximum
+)
+{
+    u32 nonzero;
+    u32 first;
+    s32 local_min;
+    s32 local_max;
+
+    analyze(
+        buffer,
+        &nonzero,
+        &local_min,
+        &local_max,
+        &first
+    );
+
+    *nonzero_total += nonzero;
+
+    if (local_min < *minimum) {
+        *minimum = local_min;
+    }
+
+    if (local_max > *maximum) {
+        *maximum = local_max;
+    }
+}
+
+static void run_playback_test(void)
+{
+    int ret;
+    int i;
+
+    result.playback_status = -1;
+    result.playback_left_min = 32767;
+    result.playback_left_max = -32768;
+    result.playback_right_min = 32767;
+    result.playback_right_max = -32768;
+
+    build_test_sample();
+
+    /*
+     * Ensure test voice 0 is not active.
+     */
+    sceSdSetSwitch(
+        SD_SWITCH_KOFF,
+        1U << TEST_VOICE
+    );
+
+    /*
+     * Upload the ADPCM loop into ordinary SPU2 RAM.
+     */
+    ret = sceSdVoiceTrans(
+        0,
+        SD_TRANS_WRITE | SD_TRANS_MODE_DMA,
+        test_adpcm,
+        (u32 *)TEST_ADPCM_ADDR,
+        TEST_ADPCM_SIZE
+    );
+
+    result.playback_transfer = ret;
+
+    if (ret < 0) {
+        result.playback_status = -10;
+        return;
+    }
+
+    if (!sceSdVoiceTransStatus(0, 1)) {
+        result.playback_status = -11;
+        return;
+    }
+
+    /*
+     * Moderate master volume for the test.
+     */
+    sceSdSetParam(
+        SD_PARAM_MVOLL,
+        0x1000
+    );
+
+    sceSdSetParam(
+        SD_PARAM_MVOLR,
+        0x1000
+    );
+
+    /*
+     * Voice 0: audible through left and right.
+     * Pitch 0x1000 = nominal playback rate.
+     */
+    sceSdSetParam(
+        SD_VPARAM_VOLL | (TEST_VOICE << 1),
+        0x1800
+    );
+
+    sceSdSetParam(
+        SD_VPARAM_VOLR | (TEST_VOICE << 1),
+        0x1800
+    );
+
+    sceSdSetParam(
+        SD_VPARAM_PITCH | (TEST_VOICE << 1),
+        0x1000
+    );
+
+    /*
+     * Fast attack, high sustain level.
+     */
+    sceSdSetParam(
+        SD_VPARAM_ADSR1 | (TEST_VOICE << 1),
+        SD_SET_ADSR1(0, 0x7F, 0, 0xF)
+    );
+
+    sceSdSetParam(
+        SD_VPARAM_ADSR2 | (TEST_VOICE << 1),
+        SD_SET_ADSR2(0, 0, 0, 0)
+    );
+
+    sceSdSetAddr(
+        SD_VADDR_SSA | (TEST_VOICE << 1),
+        TEST_ADPCM_ADDR
+    );
+
+    /*
+     * Enable dry mixing for voice 0 on both channels.
+     */
+    sceSdSetSwitch(SD_SWITCH_VMIXL, 1U << TEST_VOICE);
+    sceSdSetSwitch(SD_SWITCH_VMIXR, 1U << TEST_VOICE);
+
+    /*
+     * Start the hardware voice.
+     */
+    sceSdSetSwitch(
+        SD_SWITCH_KON,
+        1U << TEST_VOICE
+    );
+
+    DelayThread(20000);
+
+    /*
+     * Take snapshots while the SPU2 voice plays.
+     * These are diagnostic snapshots, NOT a
+     * gapless 48 kHz audio capture.
+     */
+    for (i = 0; i < TEST_READS; ++i) {
+        ret = transfer(
+            CORE0_LEFT,
+            left_buffer,
+            SD_TRANS_READ
+        );
+
+        if (ret < 0) {
+            result.playback_status = -20;
+            goto stop_voice;
+        }
+
+        accumulate_stats(
+            left_buffer,
+            &result.playback_left_nonzero,
+            &result.playback_left_min,
+            &result.playback_left_max
+        );
+
+        ret = transfer(
+            CORE0_RIGHT,
+            right_buffer,
+            SD_TRANS_READ
+        );
+
+        if (ret < 0) {
+            result.playback_status = -30;
+            goto stop_voice;
+        }
+
+        accumulate_stats(
+            right_buffer,
+            &result.playback_right_nonzero,
+            &result.playback_right_min,
+            &result.playback_right_max
+        );
+
+        ++result.playback_reads;
+
+        DelayThread(TEST_INTERVAL_US);
+    }
+
+    result.playback_status = 0;
+
+stop_voice:
+    sceSdSetSwitch(
+        SD_SWITCH_KOFF,
+        1U << TEST_VOICE
+    );
 }
 
 static void run_probe(void)
@@ -234,8 +490,14 @@ static void run_probe(void)
 
     result.status = 0;
 
-done:
-    sceSdQuit();
+    /*
+    * The original DMA round-trip has passed.
+    * Now perform the independent playback test.
+    */
+    run_playback_test();
+
+    done:
+        sceSdQuit();
 }
 
 static void *rpc_handler(
