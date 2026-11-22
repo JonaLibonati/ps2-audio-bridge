@@ -11,6 +11,7 @@
 
 #include <types.h>
 #include <irx.h>
+#include <loadcore.h>
 #include <libsd.h>
 #include <sifrpc.h>
 #include <thbase.h>
@@ -135,7 +136,7 @@ static void run_probe(void)
     memset(&result, 0, sizeof(result));
     result.status = -1;
 
-    ret = sceSdInit(SD_INIT_COLD);
+    ret = sceSdInit(0);
 
     if (ret < 0) {
         result.status = -10;
