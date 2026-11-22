@@ -26,6 +26,10 @@ IRX_ID("spu2probe", 1, 0);
 #define CORE0_LEFT     0x0800
 #define CORE0_RIGHT    0x0A00
 
+/* SPU2 core selectors */
+#define SD_CORE_0 0
+#define SD_CORE_1 1
+
 #define TEST_VOICE       0
 #define TEST_ADPCM_ADDR  0x20000
 #define TEST_ADPCM_SIZE  512
