@@ -175,6 +175,10 @@ int main(void)
         goto halt;
     }
 
+    scr_clear();
+    scr_printf("SPU2 Capture Probe v0.3\n");
+    scr_printf("=======================\n");
+
     scr_printf("\n--- DMA TEST ---\n");
 
     scr_printf("Status: %d\n", RPC_RESULT.status);
