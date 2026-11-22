@@ -170,7 +170,7 @@ static void build_test_sample(void)
         int offset = block * 16;
         u8 value = (block & 1) ? 0xDD : 0x33;
 
-        test_adpcm[offset] = 0x08;
+        test_adpcm[offset] = 0x02;
         test_adpcm[offset + 1] = 0;
 
         if (block == 0) {
@@ -274,6 +274,24 @@ static void run_playback_test(void)
         SD_PARAM_MVOLR,
         0x1000
     );
+
+
+    /*
+    * Core 1 is the final output stage for
+    * the usual SPU2 core 0 -> core 1 path.
+    *
+    * Enable moderate master volume on core 1.
+    */
+    sceSdSetParam(
+        SD_CORE_1 | SD_PARAM_MVOLL,
+        0x1000
+    );
+
+    sceSdSetParam(
+        SD_CORE_1 | SD_PARAM_MVOLR,
+        0x1000
+    );
+
 
     /*
      * Voice 0: audible through left and right.
