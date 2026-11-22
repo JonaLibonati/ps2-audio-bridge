@@ -1,8 +1,10 @@
 
 /*
- * SPU2 Capture Probe - EE launcher
+ * PS2 Audio Bridge
+ * SPU2 Capture Probe v0.3 - EE launcher
  *
- * Standalone program for real PS2 hardware.
+ * Loads FreeSD and the experimental IOP module.
+ * Displays DMA round-trip and voice playback diagnostics.
  */
 
 #include <stdio.h>
@@ -29,20 +31,27 @@ typedef struct {
     int status;
     int dma_write;
     int dma_read;
+
     unsigned int mismatches;
+
     unsigned int left_nonzero;
     unsigned int right_nonzero;
+
     int left_min;
     int left_max;
     int right_min;
     int right_max;
+
     unsigned int left_first;
     unsigned int right_first;
+
     int playback_status;
     int playback_transfer;
     unsigned int playback_reads;
+
     unsigned int playback_left_nonzero;
     unsigned int playback_right_nonzero;
+
     int playback_left_min;
     int playback_left_max;
     int playback_right_min;
@@ -55,13 +64,12 @@ static SifRpcClientData_t rpc_client
 static unsigned int rpc_send[16]
     __attribute__((aligned(64)));
 
-
 static unsigned int rpc_result_storage[32]
     __attribute__((aligned(64)));
 
-#define RPC_RESULT \
-    (*(probe_result_t *)rpc_result_storage)
+#define RPC_RESULT (*(probe_result_t *)rpc_result_storage)
 
+static void init_iop(void)
 {
     SifInitRpc(0);
 
@@ -85,10 +93,10 @@ int main(void)
 
     init_scr();
 
-    scr_printf("SPU2 Capture Probe v0.2\n");
+    scr_printf("SPU2 Capture Probe v0.3\n");
     scr_printf("------------------------------\n");
-    scr_printf("Standalone DMA memory test\n");
-    scr_printf("No games / no OPL integration\n\n");
+    scr_printf("DMA + ADPCM voice experiment\n");
+    scr_printf("No OPL game integration\n\n");
 
     init_iop();
 
@@ -168,35 +176,36 @@ int main(void)
     }
 
     scr_printf("\n--- DMA TEST ---\n");
-    scr_printf("Status: %d\n", rpc_result.status);
-    scr_printf("Write: %d bytes\n", rpc_result.dma_write);
-    scr_printf("Read:  %d bytes\n", rpc_result.dma_read);
-    scr_printf("Mismatches: %u\n", rpc_result.mismatches);
+
+    scr_printf("Status: %d\n", RPC_RESULT.status);
+    scr_printf("Write: %d\n", RPC_RESULT.dma_write);
+    scr_printf("Read: %d\n", RPC_RESULT.dma_read);
+    scr_printf("Mismatches: %u\n", RPC_RESULT.mismatches);
 
     scr_printf("\n--- CORE 0 BUFFERS ---\n");
 
     scr_printf(
-        "Left  nonzero=%u min=%d max=%d\n",
-        rpc_result.left_nonzero,
-        rpc_result.left_min,
-        rpc_result.left_max
+        "Left: %u  %d / %d\n",
+        RPC_RESULT.left_nonzero,
+        RPC_RESULT.left_min,
+        RPC_RESULT.left_max
     );
 
     scr_printf(
-        "Right nonzero=%u min=%d max=%d\n",
-        rpc_result.right_nonzero,
-        rpc_result.right_min,
-        rpc_result.right_max
+        "Right: %u  %d / %d\n",
+        RPC_RESULT.right_nonzero,
+        RPC_RESULT.right_min,
+        RPC_RESULT.right_max
     );
 
     scr_printf(
         "First L=%08X R=%08X\n",
-        rpc_result.left_first,
-        rpc_result.right_first
+        RPC_RESULT.left_first,
+        RPC_RESULT.right_first
     );
 
-    if (rpc_result.status == 0 &&
-        rpc_result.mismatches == 0) {
+    if (RPC_RESULT.status == 0 &&
+        RPC_RESULT.mismatches == 0) {
         scr_printf("\nDMA round-trip PASSED\n");
     } else {
         scr_printf("\nDMA round-trip FAILED\n");
@@ -240,7 +249,6 @@ int main(void)
         RPC_RESULT.playback_right_min,
         RPC_RESULT.playback_right_max
     );
-
 
 halt:
     scr_printf("\nSafe to restart PS2.\n");
