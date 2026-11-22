@@ -7,6 +7,12 @@ IOP_IMPORT_INCS += \
     system/sifcmd \
     system/threadman
 
+.PHONY: all
+
+.DEFAULT_GOAL := all
+
+all: $(IOP_BIN)
+
 vpath %.c ..
 
 include $(PS2SDK)/samples/Makefile.pref

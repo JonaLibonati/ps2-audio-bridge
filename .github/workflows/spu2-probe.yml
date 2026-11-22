@@ -29,7 +29,10 @@ jobs:
           test -f "$PS2SDK/iop/irx/freesd.irx"
 
       - name: Build probe
-        run: make -C ps2/spu2_probe
+        run: |
+          make -C ps2/spu2_probe
+          test -s ps2/spu2_probe/iop/spu2probe.irx
+          test -s ps2/spu2_probe/spu2_probe.elf
 
       - name: Upload ELF
         uses: actions/upload-artifact@v4
